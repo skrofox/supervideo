@@ -1,18 +1,132 @@
 <!DOCTYPE html>
-<html>
-
+<html lang="en">
 <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>XEM VIDEO CỰC LÉT</title>
+<meta charset="UTF-8" />
+<title>VIDEO WITH SRT</title>
+
+<!-- TAILWIND CDN -->
+<script src="https://cdn.tailwindcss.com"></script>
+
 </head>
+<body class="bg-gray-900 text-gray-100 p-6">
 
-<body>
-    <header>
-        <nav></nav>
-    </header>
+<h1 class="text-3xl font-bold mb-6">SUPER VIDEO</h1>
 
-    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+<!-- VIDEO PLAYER -->
+<div class="w-full max-w-4xl mx-auto">
+    <video id="player" controls class="w-full rounded-xl shadow-lg bg-black"></video>
+</div>
+
+<!-- CONTROLS -->
+<div class="mt-8 max-w-4xl mx-auto space-y-6">
+
+    <!-- VIDEO -->
+    <div>
+        <label class="block mb-2 font-medium text-lg">Chọn Video:</label>
+        <input id="videoInput" type="file" accept="video/*"
+            class="block w-full text-sm bg-gray-800 border border-gray-700 rounded-lg cursor-pointer p-3" />
+    </div>
+
+    <!-- SRT -->
+    <div>
+        <label class="block mb-2 font-medium text-lg">Chọn Subtitle (.srt):</label>
+        <input id="srtInput" type="file" accept=".srt"
+            class="block w-full text-sm bg-gray-800 border border-gray-700 rounded-lg cursor-pointer p-3" />
+    </div>
+
+</div>
+
+<script>
+const video = document.getElementById("player");
+const videoInput = document.getElementById("videoInput");
+const srtInput = document.getElementById("srtInput");
+
+// ================== LOAD VIDEO ==================
+videoInput.addEventListener("change", e => {
+    try {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        video.src = URL.createObjectURL(file);
+        video.load();
+    } catch (err) {
+        console.error("Lỗi load video:", err);
+        alert("Không load được video.");
+    }
+});
+
+// ================== LOAD SRT ==================
+srtInput.addEventListener("change", async e => {
+    try {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        const text = await file.text();
+        const cues = parseSRT(text);
+
+        // Xóa track cũ
+        [...video.textTracks].forEach(t => {
+            // remove child track elements if any exist
+        });
+
+        const track = video.addTextTrack("subtitles", "Vietnamese", "vi");
+        track.mode = "showing";
+
+        cues.forEach(c => track.addCue(c));
+
+    } catch (err) {
+        console.error("Lỗi load SRT:", err);
+        alert("Không load được SRT.");
+    }
+});
+
+// ================== PARSER SRT ==================
+function parseSRT(data) {
+    const lines = data.replace(/\r/g, "").split("\n");
+    const cues = [];
+    let i = 0;
+
+    function toSeconds(t) {
+        const [h, m, rest] = t.split(":");
+        const [s, ms] = rest.split(",");
+        return (
+            parseInt(h) * 3600 +
+            parseInt(m) * 60 +
+            parseInt(s) +
+            parseInt(ms) / 1000
+        );
+    }
+
+    while (i < lines.length) {
+        if (!lines[i].trim()) { i++; continue; }
+
+        // Skip index
+        if (/^\d+$/.test(lines[i].trim())) i++;
+
+        // Time
+        const time = lines[i].trim();
+        i++;
+        if (!time.includes("-->")) continue;
+
+        const [start, end] = time.split("-->").map(s => s.trim());
+
+        // Text
+        let text = "";
+        while (lines[i] && lines[i].trim()) {
+            text += lines[i] + "\n";
+            i++;
+        }
+        text = text.trim();
+
+        if (start && end && text)
+            cues.push(new VTTCue(toSeconds(start), toSeconds(end), text));
+
+        i++;
+    }
+
+    return cues;
+}
+</script>
+
 </body>
-
 </html>
